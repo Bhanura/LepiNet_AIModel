@@ -7,3 +7,6 @@ timm
 pandas
 scikit-learn
 pillow
+supabase
+huggingface_hub
+requests
