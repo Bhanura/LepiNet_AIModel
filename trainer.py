@@ -39,7 +39,7 @@ def fine_tune_model():
 
     # 2. Fetch 'READY' Training Data
     reviews = supabase.table("expert_reviews")\
-        .select("id, agreed_with_ai, identified_species_name, ai_logs(image_url, predicted_species_name)")\
+        .select("id, agreed_with_ai, identified_species_name, ai_logs(image_url, final_species_name)")\
         .eq("training_status", "ready")\
         .execute().data
     
@@ -56,8 +56,8 @@ def fine_tune_model():
     print(f"Downloading {len(reviews)} images...")
     for row in reviews:
         # Determine Name
-        name = row['ai_logs']['predicted_species_name'] if row['agreed_with_ai'] else row['identified_species_name']
-        
+        name = row['ai_logs']['final_species_name'] if row['agreed_with_ai'] else row['identified_species_name']
+                
         # Convert Name -> ID (b001)
         if name in name_to_id:
             cls_id = name_to_id[name]
