@@ -1,12 +1,11 @@
 ---
 title: Lepinet Backend
-emoji: 🚀
-colorFrom: yellow
-colorTo: green
+emoji: 🦀
+colorFrom: pink
+colorTo: purple
 sdk: docker
 pinned: false
-license: openrail
-short_description: Back-end For Butterfly conservation app, supports with AI
+license: mit
 ---
 
 Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference

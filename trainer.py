@@ -15,11 +15,18 @@ import json
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY") # Service Role Key
 HF_TOKEN = os.environ.get("HF_TOKEN")
-REPO_ID = "bhanura/lepinet-backend" # <--- UPDATE THIS
+
+# --- UPDATE THIS LINE BELOW TO MATCH YOUR NEW SPACE ID ---
+REPO_ID = "bhanura/lepinet-backend" # Example: "username/new-space-name"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def fine_tune_model():
     print("🚀 Starting Automated Fine-Tuning...")
+    
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        print("❌ Error: SUPABASE_URL or SUPABASE_KEY missing.")
+        return
+
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
     # 1. Fetch ALL Species IDs (To determine Class List)
@@ -44,6 +51,7 @@ def fine_tune_model():
         .execute().data
     
     if len(reviews) == 0:
+        print("No images marked 'ready' for training.")
         return "No images marked 'ready' for training."
 
     # 3. Download & Organize
@@ -83,7 +91,7 @@ def fine_tune_model():
         print("Loading existing weights (Partial)...")
         old_state = torch.load("model.pth", map_location=DEVICE)
         
-        # Filter out the "Head" (Classifier) because size might have changed (7 -> 245)
+        # Filter out the "Head" (Classifier) because size might have changed
         new_state = model.state_dict()
         pretrained_dict = {k: v for k, v in old_state.items() if k in new_state and v.size() == new_state[k].size()}
         
@@ -102,9 +110,7 @@ def fine_tune_model():
     
     # Custom Dataset to ensure we use our specific class mapping
     train_dataset = datasets.ImageFolder(data_dir, transform=transform)
-    # Force the dataset to use our sorted ID list as classes
-    # (Note: This assumes folders are named 'b001', 'b002' etc.)
-
+    
     loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
     optimizer = optim.SGD(model.parameters(), lr=0.005, momentum=0.9)
     criterion = nn.CrossEntropyLoss()
@@ -130,9 +136,13 @@ def fine_tune_model():
         json.dump(all_class_ids, f)
 
     print("Uploading to Hugging Face...")
-    api = HfApi(token=HF_TOKEN)
-    api.upload_file(path_or_fileobj="model.pth", path_in_repo="model.pth", repo_id=REPO_ID, repo_type="space")
-    api.upload_file(path_or_fileobj="classes.json", path_in_repo="classes.json", repo_id=REPO_ID, repo_type="space")
+    try:
+        api = HfApi(token=HF_TOKEN)
+        api.upload_file(path_or_fileobj="model.pth", path_in_repo="model.pth", repo_id=REPO_ID, repo_type="space")
+        api.upload_file(path_or_fileobj="classes.json", path_in_repo="classes.json", repo_id=REPO_ID, repo_type="space")
+        print("✅ Upload successful.")
+    except Exception as e:
+        print(f"❌ Upload failed: {e}")
 
     # 7. Update Database (Mark as Trained)
     if processed_ids:

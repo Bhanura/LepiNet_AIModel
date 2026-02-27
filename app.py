@@ -8,14 +8,14 @@ from sklearn.preprocessing import LabelEncoder
 from torchvision import transforms
 import io
 import json
-import trainer # Your new trainer module
+import trainer # Imports your trainer.py file
 
 app = FastAPI()
 
 # --- CONFIGURATION ---
 MODEL_FILE = "model.pth"              
-TRAIN_CSV = "butterfly_images.csv"    # Fallback for first run
-NAMES_CSV = "sri_lanka_butterflies_245.csv" # English names mapping
+TRAIN_CSV = "butterfly_images.csv"    # Fallback for first run (Must match your uploaded file)
+NAMES_CSV = "sri_lanka_butterflies_245.csv" # English names mapping (Must match your uploaded file)
 
 print("Loading LepiNet AI...")
 
@@ -39,11 +39,15 @@ if os.path.exists("classes.json"):
 if not CLASSES:
     print("⚠️ classes.json not found. Falling back to CSV...")
     try:
-        df_train = pd.read_csv(TRAIN_CSV)
-        le = LabelEncoder()
-        le.fit(df_train.iloc[:, 1]) 
-        CLASSES = list(le.classes_) 
-        print(f"✅ Classes loaded from CSV: {len(CLASSES)} species found.")
+        if os.path.exists(TRAIN_CSV):
+            df_train = pd.read_csv(TRAIN_CSV)
+            le = LabelEncoder()
+            # Assuming the label is in the 2nd column (index 1) based on your previous code
+            le.fit(df_train.iloc[:, 1]) 
+            CLASSES = list(le.classes_) 
+            print(f"✅ Classes loaded from CSV: {len(CLASSES)} species found.")
+        else:
+            print(f"❌ Critical: {TRAIN_CSV} not found! Upload this file.")
     except Exception as e:
         print(f"❌ Error loading training CSV: {e}")
 
@@ -51,10 +55,15 @@ if not CLASSES:
 # 2. LOAD NAMES MAPPING
 # ---------------------------------------------------------
 try:
-    df_names = pd.read_csv(NAMES_CSV)
-    # Create dict: {'b001': 'Tailed Jay', ...}
-    ID_TO_NAME = dict(zip(df_names['butterfly_id'], df_names['common_name_english']))
-    print(f"✅ Names loaded: {len(ID_TO_NAME)} English names found.")
+    if os.path.exists(NAMES_CSV):
+        df_names = pd.read_csv(NAMES_CSV)
+        # Create dict: {'b001': 'Tailed Jay', ...}
+        # Ensure column names match your CSV headers exactly
+        ID_TO_NAME = dict(zip(df_names['butterfly_id'], df_names['common_name_english']))
+        print(f"✅ Names loaded: {len(ID_TO_NAME)} English names found.")
+    else:
+        print(f"❌ Critical: {NAMES_CSV} not found! Upload this file.")
+        ID_TO_NAME = {}
 except Exception as e:
     print(f"❌ Error loading names CSV: {e}")
     ID_TO_NAME = {}
@@ -67,7 +76,9 @@ DEVICE = torch.device("cpu") # Hugging Face Free Tier is CPU only
 try:
     print(f"🏗️ Building model for {len(CLASSES)} classes...")
     # Create structure matching the CURRENT class count
-    model = timm.create_model('mobilenetv4_conv_small.e2400_r224_in1k', pretrained=False, num_classes=len(CLASSES))
+    # Note: If CLASSES is empty, this might fail, but the API handles it below.
+    num_classes = len(CLASSES) if CLASSES else 245 # Default to 245 if unknown
+    model = timm.create_model('mobilenetv4_conv_small.e2400_r224_in1k', pretrained=False, num_classes=num_classes)
     
     if os.path.exists(MODEL_FILE):
         # Load weights
@@ -75,7 +86,6 @@ try:
         
         # strict=False is CRITICAL here. 
         # It allows the app to load partially if there's a slight mismatch 
-        # (though ideally, classes.json and model.pth always match).
         model.load_state_dict(state_dict, strict=False)
         print("✅ Model weights loaded successfully!")
     else:
@@ -112,7 +122,7 @@ def home():
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
     if not CLASSES:
-        return {"error": "Model classes not loaded properly."}
+        return {"error": "Model classes not loaded properly. Please check logs."}
 
     try:
         # Read and preprocess image
