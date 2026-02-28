@@ -4,7 +4,7 @@ import torch
 import timm
 from PIL import Image
 import io
-from torchvision import transforms
+#from torchvision import transforms
 import pandas as pd
 
 app = FastAPI()
