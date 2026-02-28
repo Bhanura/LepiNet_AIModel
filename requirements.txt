@@ -5,8 +5,9 @@ torch
 torchvision
 timm
 pandas
-scikit-learn
 pillow
+scikit-learn
+seaborn
+matplotlib
 supabase
-huggingface_hub
-requests
+huggingface-hub
